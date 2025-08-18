@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>3D Web GIS — Elegant Cesium Starter</title>
+  
+  <!-- CesiumJS pinned (CDN) -->
+  <link href="https://cdn.jsdelivr.net/npm/cesium@1.116.0/Build/Cesium/Widgets/widgets.css" rel="stylesheet" />
+  <script>
+    // IMPORTANT: must end with a trailing slash
+    window.CESIUM_BASE_URL = "https://cdn.jsdelivr.net/npm/cesium@1.116.0/Build/Cesium/";
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/cesium@1.116.0/Build/Cesium/Cesium.js"></script>
+
+  <!-- Typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      --panel: rgba(255,255,255,0.9);
+      --text: #0f172a;
+      --muted: #64748b;
+      --chip: rgba(17, 24, 39, 0.05);
+      --ring: 0 10px 30px rgba(2,6,23,0.12);
+      --accent: #6366f1;
+      --bg: #0e1116;
+    }
+    [data-theme="dark"] {
+      --panel: rgba(17,24,39,0.8);
+      --text: #e5e7eb;
+      --muted: #9ca3af;
+      --chip: rgba(255,255,255,0.06);
+    }
+
+    html, body { height: 100%; margin: 0; }
+    body { font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; background: var(--bg); }
+
+    #app { height: 100%; position: relative; }
+    #cesiumContainer { position: absolute; inset: 0; }
+
+    /* Top bar */
+    .topbar { position: absolute; top: 16px; left: 16px; right: 16px; z-index: 1000; display: flex; gap: 12px; align-items: center; }
+    .brand { backdrop-filter: blur(10px); background: var(--panel); padding: 10px 14px; border-radius: 14px; box-shadow: var(--ring); border: 1px solid rgba(0,0,0,0.06); display: flex; gap: 10px; align-items: center; }
+    .brand .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 6px rgba(99,102,241,.15); }
+    .brand h1 { margin: 0; font-size: 14px; letter-spacing: .2px; color: var(--text); }
+
+    .toolbar { margin-left: auto; display: flex; gap: 8px; }
+    .btn { border: 1px solid rgba(0,0,0,0.06); background: var(--panel); color: var(--text); padding: 8px 12px; border-radius: 12px; font-weight: 600; font-size: 13px; cursor: pointer; box-shadow: var(--ring); backdrop-filter: blur(10px); }
+    .btn:active { transform: translateY(1px); }
+
+    /* Right panel */
+    .panel { position: absolute; top: 76px; right: 16px; width: 320px; z-index: 1000; backdrop-filter: blur(10px); background: var(--panel); border-radius: 16px; box-shadow: var(--ring); border: 1px solid rgba(0,0,0,0.06); overflow: hidden; }
+    .panel header { padding: 12px 14px; display: flex; justify-content: space-between; align-items: center; }
+    .panel header h2 { margin: 0; font-size: 12px; text-transform: uppercase; letter-spacing: .12em; color: var(--muted); }
+    .panel .section { padding: 0 14px 14px; }
+    .chips { display: flex; gap: 8px; flex-wrap: wrap; }
+    .chip { border: 1px solid rgba(0,0,0,0.08); background: var(--chip); color: var(--text); padding: 6px 10px; border-radius: 999px; font-size: 13px; cursor: pointer; user-select: none; }
+    .chip[data-active="false"] { opacity: .35; }
+
+    /* Bottom-left help */
+    .help { position: absolute; left: 16px; bottom: 16px; z-index: 1000; backdrop-filter: blur(10px); background: var(--panel); color: var(--text); padding: 10px 12px; border-radius: 12px; box-shadow: var(--ring); border: 1px solid rgba(0,0,0,0.06); max-width: 360px; font-size: 13px; }
+    .help strong { color: var(--accent); }
+
+    @media (max-width: 860px){
+      .panel { width: calc(100% - 32px); left: 16px; right: 16px; top: auto; bottom: 90px; }
+      .toolbar { display: none; }
+    }
+  </style>
+
+  <script>
+    // Friendly overlay if opened via file:// (workers & assets fail under file protocol)
+    (function(){
+      if (location.protocol === 'file:') {
+        const warn = document.createElement('div');
+        warn.style.cssText = 'position:fixed;inset:0;display:grid;place-items:center;background:rgba(14,17,22,.92);color:#fff;z-index:99999;font-family:Inter,system-ui,sans-serif;';
+        warn.innerHTML = '<div style="max-width:740px;padding:24px 28px;border-radius:16px;background:#111826;box-shadow:0 10px 30px rgba(0,0,0,.4)">\
+          <div style="font-weight:700;font-size:18px;margin-bottom:8px">Run this over HTTP</div>\
+          <div style="opacity:.9;line-height:1.6">You opened this page with <code>file://</code>. Cesium loads web workers and image tiles that require HTTP/HTTPS.\
+          <br/><br/>Quick options: <ul style=\'margin:8px 0 0 18px\'><li><code>python -m http.server 5500</code> → open <code>http://localhost:5500/</code></li><li><code>npx http-server</code> or <code>npx serve</code></li><li>VS Code → “Open with Live Server”</li></ul>\
+          <br/>Once served over HTTP, refresh and this overlay will disappear.</div>';
+        window.addEventListener('DOMContentLoaded', ()=> document.body.appendChild(warn));
+      }
+    })();
+  </script>
+</head>
+<body data-theme="light">
+  <div id="app">
+    <div class="topbar">
+      <div class="brand"><span class="dot"></span><h1>3D City Explorer</h1></div>
+      <div class="toolbar">
+        <button class="btn" id="flyNYC">NYC</button>
+        <button class="btn" id="flyHanoi">Hanoi</button>
+        <button class="btn" id="flyLondon">London</button>
+        <button class="btn" id="toggleTheme">🌙 Dark</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <header>
+        <h2>Layers & Controls</h2>
+        <button class="btn" id="resetView" style="padding:6px 10px">Reset</button>
+      </header>
+      <div class="section">
+        <div class="chips">
+          <span class="chip" data-key="terrain" data-active="false">Terrain</span>
+          <span class="chip" data-key="points" data-active="true">POI</span>
+          <span class="chip" data-key="polygons" data-active="true">Extrusions</span>
+          <span class="chip" data-key="shadows" data-active="false">Shadows</span>
+          <span class="chip" data-key="atmosphere" data-active="true">Atmosphere</span>
+        </div>
+      </div>
+      <div class="section">
+        <label style="display:block; color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:.12em; margin-bottom:8px">Time of Day</label>
+        <input id="timeSlider" type="range" min="0" max="24" step="0.25" value="12" style="width:100%" />
+      </div>
+    </div>
+
+    <div id="cesiumContainer"></div>
+
+    <div class="help">
+      <div><strong>Tips:</strong> 🖱️ Right-drag to tilt • 🖱️ Shift-drag to orbit • ⌘/Ctrl + Scroll to zoom.</div>
+      <div style="margin-top:6px">Enable <strong>Terrain</strong> (requires a free Cesium ion token) for realistic relief. Toggle <strong>Extrusions</strong> to see 3D polygons. Use the city buttons to fly.</div>
+    </div>
+  </div>
+
+<script>
+  // =============================
+  // 0) Ion Token (optional)
+  // =============================
+  // If you have a Cesium ion token, set it here to enable World Terrain and other assets
+  // Cesium.Ion.defaultAccessToken = "YOUR_ION_TOKEN_HERE";
+
+  // =============================
+  // 1) Viewer
+  // =============================
+  const viewer = new Cesium.Viewer('cesiumContainer', {
+    baseLayerPicker: false,
+    geocoder: false,
+    timeline: false,
+    animation: false,
+    homeButton: false,
+    sceneModePicker: false,
+    navigationHelpButton: false,
+    fullscreenButton: false,
+    selectionIndicator: false,
+    infoBox: true
+  });
+
+  viewer.scene.skyAtmosphere.show = true;
+  viewer.scene.globe.enableLighting = false;
+  viewer.scene.postProcessStages.fxaa.enabled = true;
+
+  // ---- Basemap setup with robust fallbacks (fixes blue-globe/no-texture) ----
+  const imgLayers = viewer.imageryLayers;
+  imgLayers.removeAll();
+
+  function addOSM() {
+    const provider = new Cesium.OpenStreetMapImageryProvider({ url: 'https://tile.openstreetmap.org/' });
+    provider.errorEvent.addEventListener(() => {
+      console.warn('OSM imagery failed, switching to CARTO Voyager');
+      addCartoVoyager();
+    });
+    imgLayers.addImageryProvider(provider);
+  }
+
+  function addCartoVoyager() {
+    const provider = new Cesium.UrlTemplateImageryProvider({
+      url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+      subdomains: ['a','b','c','d'],
+      credit: '© OpenStreetMap contributors © CARTO'
+    });
+    imgLayers.addImageryProvider(provider);
+  }
+
+  try { addOSM(); } catch (e) { addCartoVoyager(); }
+
+  // =============================
+  // 2) Camera presets
+  // =============================
+  const presets = {
+    NYC:    { lng: -73.9857, lat: 40.7484, height: 2500, heading: 0.1, pitch: -0.8, roll: 0.0 },
+    Hanoi:  { lng: 105.8342, lat: 21.0278, height: 3500, heading: 0.0, pitch: -0.7, roll: 0.0 },
+    London: { lng:   -0.1276, lat: 51.5072, height: 3000, heading: 0.2, pitch: -0.8, roll: 0.0 }
+  };
+
+  function flyToPreset(name, ms=1800) {
+    const p = presets[name];
+    viewer.camera.flyTo({
+      destination: Cesium.Cartesian3.fromDegrees(p.lng, p.lat, p.height),
+      orientation: { heading: p.heading, pitch: p.pitch, roll: p.roll },
+      duration: ms/1000
+    });
+  }
+
+  // Initial view
+  flyToPreset('NYC', 1200);
+
+  // =============================
+  // 3) Sample Data (GeoJSON)
+  // =============================
+  const CATEGORY_COLORS = {
+    Hospital: Cesium.Color.fromCssColorString('#ef4444'),
+    School:   Cesium.Color.fromCssColorString('#3b82f6'),
+    Park:     Cesium.Color.fromCssColorString('#22c55e'),
+    Museum:   Cesium.Color.fromCssColorString('#a855f7'),
+    Other:    Cesium.Color.fromCssColorString('#f59e0b')
+  };
+
+  const sampleGeoJSON = {
+    type: 'FeatureCollection',
+    features: [
+      // Points (POI)
+      { type: 'Feature', properties: { name: 'Metropolitan Museum of Art', category: 'Museum',  address: '1000 5th Ave, New York, NY', height: 40 }, geometry: { type: 'Point',   coordinates: [-73.9632, 40.7794] } },
+      { type: 'Feature', properties: { name: 'NYU Langone Health',          category: 'Hospital', address: '550 1st Ave, New York, NY',  height: 50 }, geometry: { type: 'Point',   coordinates: [-73.9754, 40.742 ] } },
+      { type: 'Feature', properties: { name: 'PS 41 Greenwich Village',     category: 'School',   address: '116 W 11th St, New York, NY',height: 30 }, geometry: { type: 'Point',   coordinates: [-74.0007, 40.7367] } },
+
+      // Simple extruded polygons (rectangles approximating footprints)
+      { type: 'Feature', properties: { name: 'Custom Tower',   category: 'Other', extrude: 120 }, geometry: { type: 'Polygon', coordinates: [[
+        [-73.9859, 40.7488], [-73.9852, 40.7488], [-73.9852, 40.7482], [-73.9859, 40.7482], [-73.9859, 40.7488]
+      ]] } },
+      { type: 'Feature', properties: { name: 'Park Pavilion',  category: 'Park',  extrude: 12 },  geometry: { type: 'Polygon', coordinates: [[
+        [-73.9744, 40.7642], [-73.9738, 40.7642], [-73.9738, 40.7637], [-73.9744, 40.7637], [-73.9744, 40.7642]
+      ]] } }
+    ]
+  };
+
+  let ds;
+  Cesium.GeoJsonDataSource.load(sampleGeoJSON, { clampToGround: false }).then(source => {
+    ds = source;
+    viewer.dataSources.add(ds);
+
+    const entities = ds.entities.values;
+    for (let i = 0; i < entities.length; i++) {
+      const e = entities[i];
+      const props = e.properties || {};
+
+      if (e.point) {
+        const cat = props.category?.getValue?.() || 'Other';
+        const color = CATEGORY_COLORS[cat] || CATEGORY_COLORS.Other;
+        e.point.pixelSize = 12;
+        e.point.color = color.withAlpha(0.95);
+        e.point.outlineColor = Cesium.Color.BLACK.withAlpha(0.25);
+        e.point.outlineWidth = 1;
+        e.label = new Cesium.LabelGraphics({
+          text: props.name?.getValue?.() || 'POI',
+          font: '700 12px Inter',
+          pixelOffset: new Cesium.Cartesian2(0, -18),
+          fillColor: Cesium.Color.WHITE,
+          outlineColor: Cesium.Color.fromCssColorString('#111827'),
+          outlineWidth: 3,
+          style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+          showBackground: true,
+          backgroundColor: Cesium.Color.fromCssColorString('rgba(17,24,39,.65)')
+        });
+      }
+
+      if (e.polygon) {
+        const extrude = props.extrude?.getValue?.() || 0;
+        const cat = props.category?.getValue?.() || 'Other';
+        const color = (CATEGORY_COLORS[cat] || CATEGORY_COLORS.Other).withAlpha(0.85);
+        e.polygon.material = color;
+        e.polygon.outline = true;
+        e.polygon.outlineColor = Cesium.Color.BLACK.withAlpha(0.25);
+        e.polygon.extrudedHeight = extrude;
+      }
+    }
+  });
+
+  // =============================
+  // 4) Controls
+  // =============================
+  const chips = document.querySelectorAll('.chip');
+  const layersState = { terrain: false, points: true, polygons: true, shadows: false, atmosphere: true };
+
+  chips.forEach(ch => {
+    ch.addEventListener('click', () => {
+      const key = ch.dataset.key; const active = ch.dataset.active !== 'false';
+      ch.dataset.active = (!active).toString();
+      layersState[key] = !active;
+      applyLayerState();
+    });
+  });
+
+  document.getElementById('resetView').onclick = () => flyToPreset('NYC');
+  document.getElementById('flyNYC').onclick = () => flyToPreset('NYC');
+  document.getElementById('flyHanoi').onclick = () => flyToPreset('Hanoi');
+  document.getElementById('flyLondon').onclick = () => flyToPreset('London');
+
+  document.getElementById('toggleTheme').onclick = (e) => {
+    const body = document.body; const dark = body.getAttribute('data-theme') === 'dark';
+    body.setAttribute('data-theme', dark ? 'light' : 'dark');
+    e.target.textContent = dark ? '🌙 Dark' : '☀️ Light';
+  };
+
+  // Time of day (sun position)
+  const slider = document.getElementById('timeSlider');
+  slider.addEventListener('input', () => {
+    const hours = parseFloat(slider.value);
+    const now = Cesium.JulianDate.now();
+    const js = Cesium.JulianDate.toDate(now);
+    js.setUTCHours(Math.floor(hours), Math.round((hours%1)*60), 0, 0);
+    const newTime = Cesium.JulianDate.fromDate(js);
+    viewer.clock.currentTime = newTime;
+    viewer.scene.light = new Cesium.SunLight();
+    viewer.scene.globe.enableLighting = true;
+  });
+
+  function applyLayerState(){
+    // Atmosphere
+    viewer.scene.skyAtmosphere.show = !!layersState.atmosphere;
+
+    // Shadows
+    viewer.shadows = !!layersState.shadows;
+    viewer.scene.shadowMap.enabled = !!layersState.shadows;
+
+    // Entities visibility
+    if (ds) {
+      const entities = ds.entities.values;
+      for (let i=0; i<entities.length; i++) {
+        const e = entities[i];
+        if (e.point) e.show = !!layersState.points;
+        if (e.polygon) e.show = !!layersState.polygons;
+      }
+    }
+
+    // Terrain
+    const hasToken = !!Cesium.Ion.defaultAccessToken;
+    if (layersState.terrain && hasToken) {
+      viewer.terrainProvider = Cesium.createWorldTerrain();
+      viewer.scene.globe.depthTestAgainstTerrain = true;
+    } else {
+      viewer.terrainProvider = new Cesium.EllipsoidTerrainProvider();
+      viewer.scene.globe.depthTestAgainstTerrain = false;
+      if (layersState.terrain && !hasToken) {
+        console.warn('Enable terrain requires a Cesium ion token (set Cesium.Ion.defaultAccessToken).');
+        alert('Terrain requires a free Cesium ion token. Set Cesium.Ion.defaultAccessToken in the code.');
+      }
+    }
+
+    // Ensure globe renders even if imagery is still loading
+    viewer.scene.requestRender();
+  }
+
+  // Initial layer state
+  applyLayerState();
+</script>
+</body>
+</html>
